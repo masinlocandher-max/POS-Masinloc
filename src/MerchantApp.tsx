@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Archive, BadgeCheck, Banknote, Boxes, ChefHat, ClipboardList, Clock3, Home, LogIn, LogOut, Menu as MenuIcon, Minus, PackagePlus, Plus, RefreshCw, ShieldCheck, ShoppingCart, Store, Users, WalletCards } from 'lucide-react'
 import { supabase } from './lib/supabase'
+import MarketplaceProfileTool from './MarketplaceProfileTool'
 import {
   advanceOrder,
   archiveProduct,
@@ -51,7 +52,7 @@ import {
 import { uploadPaymentQr } from './lib/paymentAssetApi'
 
 type Tab = 'home' | 'orders' | 'pos' | 'customers' | 'more'
-type Tool = 'overview' | 'catalog' | 'payments' | 'expenses' | 'cash' | 'attendance' | 'audit'
+type Tool = 'overview' | 'marketplace' | 'catalog' | 'payments' | 'expenses' | 'cash' | 'attendance' | 'audit'
 const money = (amount: number) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', maximumFractionDigits: 0 }).format(amount || 0)
 const statusLabel: Record<OrderStatus, string> = { parked: 'Parked', awaiting_payment: 'Awaiting payment', payment_review: 'Verify payment', paid: 'Paid', preparing: 'Preparing', ready: 'Ready', out_for_delivery: 'Out for delivery', completed: 'Completed', cancelled: 'Cancelled' }
 
@@ -185,12 +186,13 @@ function CustomersScreen({ customers, disabled }: { customers: CustomerRow[]; di
 function MoreScreen(props:{context:MerchantContext|null;tool:Tool;loadTool:(t:Tool)=>Promise<void>;plan:PlanLimits|null;products:ProductRow[];categories:CategoryRow[];payments:PaymentMethodRow[];expenses:ExpenseRow[];cashSessions:CashSessionRow[];attendance:AttendanceRow[];audit:AuditRow[];onRefresh:()=>Promise<void>;setProducts:(v:ProductRow[])=>void;setCategories:(v:CategoryRow[])=>void;setPayments:(v:PaymentMethodRow[])=>void;setExpenses:(v:ExpenseRow[])=>void;setCashSessions:(v:CashSessionRow[])=>void;setAttendance:(v:AttendanceRow[])=>void;setAudit:(v:AuditRow[])=>void;onError:(m:string)=>void;onNotice:(m:string)=>void}) {
   const {context,tool,loadTool,plan,products,categories,payments,expenses,cashSessions,attendance,audit,onRefresh,setProducts,setCategories,setPayments,setExpenses,setCashSessions,setAttendance,setAudit,onError,onNotice}=props
   if(tool!=='overview') return <ToolScreen title={tool} onBack={()=>void loadTool('overview')}>{context?.outlet_id ? <ToolBody tool={tool} context={context} plan={plan} products={products} categories={categories} payments={payments} expenses={expenses} cashSessions={cashSessions} attendance={attendance} audit={audit} onRefresh={onRefresh} setProducts={setProducts} setCategories={setCategories} setPayments={setPayments} setExpenses={setExpenses} setCashSessions={setCashSessions} setAttendance={setAttendance} setAudit={setAudit} onError={onError} onNotice={onNotice}/>:<Empty icon={<ShieldCheck/>} title="Sign in required." body="Operational settings only load from an approved merchant account." />}</ToolScreen>
-  const tools:Array<[Tool,React.ReactNode,string,string]>=[['catalog',<Boxes/>,'Catalog & Inventory',plan?`${products.length}/${plan.product_limit} products`:'Products, stock & sold out'],['payments',<WalletCards/>,'Payment Methods','Cash, merchant QR & verification'],['expenses',<Banknote/>,'Expenses','Record operating expenses'],['cash',<Banknote/>,'Cash Register','Opening float & cash variance'],['attendance',<Clock3/>,'Attendance','Clock in / clock out'],['audit',<ShieldCheck/>,'Audit Trail','Sensitive operational actions']]
+  const tools:Array<[Tool,React.ReactNode,string,string]>=[['marketplace',<Store/>,'Masinloc Connect Marketplace','Public listing & Order now'],['catalog',<Boxes/>,'Catalog & Inventory',plan?`${products.length}/${plan.product_limit} products`:'Products, stock & sold out'],['payments',<WalletCards/>,'Payment Methods','Cash, merchant QR & verification'],['expenses',<Banknote/>,'Expenses','Record operating expenses'],['cash',<Banknote/>,'Cash Register','Opening float & cash variance'],['attendance',<Clock3/>,'Attendance','Clock in / clock out'],['audit',<ShieldCheck/>,'Audit Trail','Sensitive operational actions']]
   return <section><div className="page-heading"><div><p className="eyebrow">Operations</p><h1>More</h1></div></div>{plan&&<div className="plan-card"><strong>Community Free</strong><span>{plan.product_limit} products · {plan.category_limit} categories · {plan.staff_limit} staff + owner · {plan.outlet_limit} location</span></div>}<div className="settings-list">{tools.map(([id,icon,title,desc])=><button key={id} onClick={()=>void loadTool(id)}><span className="settings-icon">{icon}</span><span className="settings-copy"><strong>{title}</strong><small>{desc}</small></span><b>›</b></button>)}</div></section>
 }
 
 function ToolBody(props:any) {
   const {tool,context,plan,products,categories,payments,expenses,cashSessions,attendance,audit,onRefresh,setProducts,setCategories,setPayments,setExpenses,setCashSessions,setAttendance,setAudit,onError,onNotice}=props
+  if(tool==='marketplace') return <MarketplaceProfileTool context={context} onError={onError} onNotice={onNotice} />
   if(tool==='catalog') return <CatalogTool {...{context,plan,products,categories,onRefresh,setProducts,setCategories,onError,onNotice}} />
   if(tool==='payments') return <PaymentsTool {...{context,payments,setPayments,onError,onNotice}} />
   if(tool==='expenses') return <ExpensesTool {...{context,expenses,setExpenses,onError}} />

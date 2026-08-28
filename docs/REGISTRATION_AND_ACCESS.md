@@ -16,7 +16,7 @@ Customer ordering remains account-free. The eligibility gate applies to merchant
 
 ## Merchant registration
 
-Initial registration collects:
+Keep initial registration simple. Collect:
 
 - owner's full name
 - business name
@@ -24,8 +24,10 @@ Initial registration collects:
 - barangay/locality in Masinloc
 - complete business address
 - Philippine mobile number
-- verification document, such as a business permit, barangay certification, or another acceptable proof of a genuine Masinloc business
 - confirmation that the applicant is Masinloqueño and the business operates in Masinloc
+- optional supporting document, such as a business permit, barangay certification, or another acceptable proof of a genuine Masinloc business
+
+Supporting proof should not block a straightforward application when the admin can verify the business from the submitted details. Admins may request additional proof when verification is unclear.
 
 Registration does not immediately create an active merchant account.
 
@@ -61,7 +63,7 @@ Admin review should display:
 - business type
 - Masinloc locality/address
 - mobile number
-- submitted verification document
+- optional supporting document when supplied
 - duplicate-account indicators
 - application history
 
@@ -69,7 +71,7 @@ Admin actions:
 
 - approve
 - reject with reason
-- request correction/additional proof later
+- request correction/additional proof when needed
 - suspend an already-approved merchant if eligibility or integrity issues are discovered
 
 Every approval/rejection/suspension action must create an audit event recording the acting admin, timestamp, previous state, new state, and reason when applicable.

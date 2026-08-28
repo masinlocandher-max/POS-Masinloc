@@ -1,4 +1,5 @@
-import { FormEvent, ReactNode, useMemo, useState } from 'react'
+import { useState } from 'react'
+import type { FormEvent, ReactNode } from 'react'
 import { ArrowLeft, BadgeCheck, CheckCircle2, Clock3, FileCheck2, ShieldCheck, Store, XCircle } from 'lucide-react'
 import './registration.css'
 
@@ -34,7 +35,8 @@ function MasinlocBrand() {
 }
 
 function RegistrationGate({ children }: { children: ReactNode }) {
-  const adminPreview = useMemo(() => new URLSearchParams(window.location.search).get('admin') === '1', [])
+  const localPreview = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+  const adminPreview = localPreview && new URLSearchParams(window.location.search).get('admin') === '1'
   const [view, setView] = useState<GateView>(adminPreview ? 'pending' : 'welcome')
   const [application, setApplication] = useState<Application>(adminPreview ? {
     ownerName: 'Juan Dela Cruz',
@@ -133,7 +135,7 @@ function RegistrationGate({ children }: { children: ReactNode }) {
         <button className="registration-primary" onClick={() => setView('register')}>Register Your Business</button>
         <p className="registration-note">Registration is reviewed by an admin before the business account is activated.</p>
 
-        <button className="approved-preview" onClick={() => setView('approved')}>Preview approved merchant app</button>
+        {localPreview && <button className="approved-preview" onClick={() => setView('approved')}>Preview approved merchant app</button>}
       </main>
     </div>
   )
@@ -146,7 +148,7 @@ function RegistrationForm({ application, setApplication, onBack, onSubmit }: {
   onSubmit: () => void
 }) {
   const [confirmed, setConfirmed] = useState(false)
-  const canSubmit = application.ownerName.trim() && application.businessName.trim() && application.barangay.trim() && application.address.trim() && application.mobile.trim() && application.proofName && confirmed
+  const canSubmit = Boolean(application.ownerName.trim() && application.businessName.trim() && application.barangay.trim() && application.address.trim() && application.mobile.trim() && application.proofName && confirmed)
 
   const update = (key: keyof Application, value: string) => setApplication({ ...application, [key]: value })
   const submit = (event: FormEvent) => { event.preventDefault(); if (canSubmit) onSubmit() }

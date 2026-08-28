@@ -8,9 +8,13 @@ Version 1 focuses on one reliable transaction loop:
 
 ## Status
 
-Private staging. The app builds and deploys, but it is **not open to the public
-yet** — a staging access code gates the whole build and nothing publishes on a
-push. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+Private staging. The app is on `main` and CI is green, but it is **not open to
+the public yet** — a staging access code gates the whole build, the page is
+`noindex`, and nothing publishes on a push.
+
+To put it in the team's hands, an admin needs to enable GitHub Pages and add
+the `STAGING_ACCESS_CODE` secret, then run the **Deploy staging** workflow.
+Steps in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md#deploying-staging).
 
 ## Running it
 

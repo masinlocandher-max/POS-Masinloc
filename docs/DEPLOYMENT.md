@@ -109,13 +109,30 @@ approval: never treat client-side state as an authorization boundary.
 
 ### Deploying staging
 
-Set these in the repository before the first run:
+Three steps, in order. The first two can only be done by someone with admin
+rights on the repository.
 
-- secret `STAGING_ACCESS_CODE` — the code the team types
-- variable `BASE_PATH` — leave empty unless the host demands an absolute base
+1. **Enable GitHub Pages.** Settings → Pages → Source: **GitHub Actions**.
+   Without this the deploy job fails at `actions/configure-pages`. Note that
+   Pages on a *private* repository requires a paid GitHub plan; on a public
+   repository it is free.
 
-Then run the **Deploy staging** workflow manually. It refuses to publish if no
-access code is set.
+2. **Add the staging code.** Settings → Secrets and variables → Actions →
+   New repository secret, named `STAGING_ACCESS_CODE`. This is the code the
+   team types to open the build. The workflow refuses to publish without it —
+   verified: a dispatch with the secret unset fails at the guard step and
+   skips the build, upload and deploy jobs entirely.
+
+   Optionally add a repository *variable* `BASE_PATH`. Leave it unset in
+   almost all cases — see below.
+
+3. **Run it.** Actions → Deploy staging → Run workflow, on `main`.
+
+The published URL will be `https://<owner>.github.io/<repo>/` — a sub-path,
+not the domain root. That works with no `BASE_PATH` set, because the base is
+relative; this is precisely the failure mode the 404 fix removed. Only set
+`BASE_PATH` if you later move the app to a host that demands absolute asset
+URLs, and keep the value ASCII.
 
 ### Opening to the public, later
 

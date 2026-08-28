@@ -6,6 +6,21 @@ Version 1 focuses on one reliable transaction loop:
 
 **Scan → Order for [Name] → Dine In / Pick Up / Delivery → Menu → Pay → Verify → Kitchen → Ready → Complete → Loyalty**
 
+## Status
+
+Private staging. The app builds and deploys, but it is **not open to the public
+yet** — a staging access code gates the whole build and nothing publishes on a
+push. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+## Running it
+
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build    # type-check, build, and run the 404 guards
+npm run preview  # serve dist/ the way a host would
+```
+
 ## Product principles
 
 - Restaurant-first.
@@ -41,3 +56,9 @@ Version 1 focuses on one reliable transaction loop:
 - Advanced CRM
 - Accounting integrations
 - Official fiscal invoicing/BIR accreditation layer
+
+## Documentation
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — module boundaries and domain model
+- [docs/REGISTRATION_AND_ACCESS.md](docs/REGISTRATION_AND_ACCESS.md) — merchant eligibility and approval
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — deployment, the 404 post-mortem, and the no-public-access posture

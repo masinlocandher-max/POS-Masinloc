@@ -74,7 +74,7 @@ button:disabled { cursor: not-allowed; opacity: .45; }
 .quick-grid svg { width: 20px; }
 .quick-grid span { display: flex; flex-direction: column; gap: 3px; }
 .quick-grid small { color: var(--muted); }
-.bottom-nav { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(100%, 620px); z-index: 20; background: rgba(255,255,255,.97); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); padding: 8px max(8px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)); }
+.bottom-nav { position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(100%, 620px); z-index: 20; background: var(--surface); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(5, 1fr); padding: 8px max(8px, env(safe-area-inset-left)) calc(8px + env(safe-area-inset-bottom)); }
 .nav-button { border: 0; background: transparent; min-height: 54px; border-radius: 12px; color: #8390a6; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; font-size: 10px; font-weight: 800; }
 .nav-button svg { width: 20px; height: 20px; }
 .nav-button.active { color: var(--navy); background: #eef3ff; }
@@ -157,3 +157,300 @@ button:disabled { cursor: not-allowed; opacity: .45; }
   .app-shell, .guest-shell { min-height: calc(100vh - 44px); border-radius: 22px; overflow: hidden; }
   .bottom-nav { bottom: 22px; border-radius: 0 0 22px 22px; }
 }
+
+/* ── Mobile hardening ─────────────────────────────────────────────────────
+   Touch devices need explicit handling that desktop CSS never asks for:
+   safe-area insets around notches and home indicators, a tap highlight that
+   is not the browser's grey flash, and 16px inputs so iOS Safari does not
+   zoom the viewport when a field takes focus.                             */
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior-y: contain;
+}
+
+button, input, textarea, select {
+  -webkit-tap-highlight-color: transparent;
+  font-family: inherit;
+}
+
+input, textarea, select { font-size: max(16px, 1rem); }
+
+.app-shell, .guest-shell { min-height: 100dvh; }
+.topbar, .guest-header { padding-top: calc(14px + env(safe-area-inset-top)); }
+.content, .guest-content {
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
+  padding-left: max(16px, env(safe-area-inset-left));
+  padding-right: max(16px, env(safe-area-inset-right));
+}
+.content-flush {
+  padding-top: 16px;
+  /* Sub-screens have no bottom nav, so they must not reserve room for one. */
+  padding-bottom: calc(20px + env(safe-area-inset-bottom));
+}
+.topbar-spacer { width: 42px; flex: 0 0 42px; }
+.subscreen-title { font-size: 15px; letter-spacing: -.02em; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .primary:active, .secondary:active, .product-card:active, .choice:active,
+  .quick-grid button:active, .ticket button:active { transform: scale(.985); }
+}
+
+.offline-banner {
+  position: sticky;
+  top: 0;
+  z-index: 9;
+  margin: 0;
+  padding: 10px 16px;
+  background: #fff4da;
+  color: var(--warning);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-bottom: 1px solid #f0dfb4;
+}
+
+.offline-banner svg { flex: 0 0 auto; }
+
+/* ── Bottom nav badges ─────────────────────────────────────────────────── */
+
+.nav-icon { position: relative; display: grid; place-items: center; }
+
+.nav-badge {
+  position: absolute;
+  top: -5px;
+  left: 11px;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 999px;
+  background: var(--red);
+  color: white;
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+/* ── Order card actions ────────────────────────────────────────────────── */
+
+.order-actions { display: grid; grid-template-columns: auto 1fr; gap: 8px; margin-top: 12px; }
+.order-actions .primary.small, .order-actions .secondary.small { margin-top: 0; }
+.secondary.small { width: auto; min-height: 42px; padding: 0 14px; border-radius: 12px; font-size: 13px; }
+
+/* ── Kitchen display ───────────────────────────────────────────────────── */
+
+.kitchen-note { margin: -8px 0 16px; }
+.ticket-stack { display: grid; gap: 12px; }
+
+.ticket {
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--blue);
+  border-radius: 16px;
+  padding: 14px;
+  background: white;
+}
+
+.ticket-fresh { border-left-color: var(--success); }
+.ticket-warn { border-left-color: var(--yellow); }
+.ticket-late { border-left-color: var(--red); }
+
+.ticket-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.ticket-head > div { display: flex; flex-direction: column; min-width: 0; }
+.ticket-head strong { font-size: 17px; letter-spacing: -.02em; }
+.ticket-head span { color: var(--muted); font-size: 11px; margin-top: 3px; }
+
+.ticket-timer {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 999px;
+  background: var(--soft);
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 900;
+  color: var(--ink);
+  margin-top: 0 !important;
+}
+
+.ticket-late .ticket-timer { background: #fdecec; color: var(--red); }
+.ticket-warn .ticket-timer { background: #fff4da; color: var(--warning); }
+
+.ticket-items { list-style: none; margin: 12px 0 14px; padding: 0; display: grid; gap: 10px; }
+.ticket-items li { display: grid; grid-template-columns: 34px 1fr; align-items: start; gap: 6px; }
+.ticket-items b { color: var(--navy); font-size: 17px; }
+.ticket-items span { font-size: 15px; font-weight: 750; line-height: 1.3; }
+.ticket-items em { display: block; color: var(--red); font-style: normal; font-size: 12px; font-weight: 700; margin-top: 3px; }
+
+/* ── POS ───────────────────────────────────────────────────────────────── */
+
+.product-card { position: relative; }
+.product-card.unavailable { opacity: .5; }
+.product-flag, .product-qty { position: absolute; top: 10px; right: 10px; font-style: normal; }
+.product-flag { font-size: 9px; font-weight: 900; color: var(--red); text-transform: uppercase; letter-spacing: .06em; }
+
+.product-qty {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--navy);
+  color: white;
+  font-size: 11px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+}
+
+.pos-cart-actions { display: flex; align-items: center; gap: 8px; }
+.pos-cart .primary { min-height: 44px; }
+
+.ghost-clear {
+  border: 0;
+  background: rgba(255,255,255,.14);
+  color: white;
+  min-height: 44px;
+  padding: 0 14px;
+  border-radius: 12px;
+  font-weight: 800;
+  font-size: 13px;
+}
+
+.pos-confirmation {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -8px 0 16px;
+  padding: 11px 13px;
+  border-radius: 12px;
+  background: #e9f7ef;
+  color: var(--success);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+/* ── Order chat ────────────────────────────────────────────────────────── */
+
+.chat-intro { margin-top: 0; }
+.chat-list { display: grid; }
+
+.chat-list button {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: white;
+  padding: 13px 0;
+  display: grid;
+  grid-template-columns: 42px 1fr auto;
+  align-items: center;
+  gap: 11px;
+  text-align: left;
+  min-height: 68px;
+}
+
+.chat-list-body { display: flex; flex-direction: column; min-width: 0; gap: 4px; }
+.chat-list-body strong { font-size: 14px; }
+.chat-list-body span { color: var(--muted); font-size: 12px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--blue); }
+
+/* The thread fills the screen so the composer sits at the bottom edge on a
+   phone instead of floating in the middle of a half-empty page. */
+.chat-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: calc(100dvh - 108px);
+}
+.chat-thread-head { display: flex; flex-direction: column; gap: 8px; border-bottom: 1px solid var(--line); padding-bottom: 12px; }
+.chat-thread-head .text-action { align-self: flex-start; padding: 0; font-size: 12px; }
+.chat-thread-head > div { display: flex; flex-direction: column; gap: 3px; }
+.chat-thread-head strong { font-size: 15px; }
+.chat-thread-head span { color: var(--muted); font-size: 11px; }
+
+.chat-messages { flex: 1; display: grid; gap: 8px; align-content: start; }
+
+.bubble { max-width: 82%; border-radius: 16px; padding: 10px 13px; }
+.bubble p { margin: 0; font-size: 14px; line-height: 1.45; }
+.bubble time { display: block; margin-top: 5px; font-size: 10px; opacity: .65; }
+.bubble-customer { justify-self: start; background: var(--soft); border-bottom-left-radius: 5px; }
+.bubble-store { justify-self: end; background: var(--navy); color: white; border-bottom-right-radius: 5px; }
+
+.quick-replies { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 4px; scrollbar-width: none; }
+.quick-replies::-webkit-scrollbar { display: none; }
+
+.quick-replies button {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: white;
+  border-radius: 999px;
+  min-height: 38px;
+  padding: 0 14px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.chat-composer {
+  position: sticky;
+  bottom: calc(8px + env(safe-area-inset-bottom));
+  display: grid;
+  grid-template-columns: 1fr 48px;
+  gap: 8px;
+  padding: 8px;
+  border-radius: 16px;
+  background: white;
+  box-shadow: 0 8px 26px rgba(24,47,86,.14);
+  border: 1px solid var(--line);
+}
+
+.chat-composer input { border: 0; background: transparent; min-height: 44px; padding: 0 8px; color: var(--ink); }
+.chat-composer input:focus { outline: none; }
+
+.chat-composer button {
+  border: 0;
+  border-radius: 12px;
+  background: var(--navy);
+  color: white;
+  display: grid;
+  place-items: center;
+}
+
+.guest-chat {
+  padding-bottom: calc(16px + env(safe-area-inset-bottom));
+  padding-top: 18px;
+}
+
+/* ── More ──────────────────────────────────────────────────────────────── */
+
+.settings-list button { gap: 10px; }
+.settings-pending { color: var(--muted) !important; }
+.soon { margin-left: auto; font-style: normal; font-size: 10px; font-weight: 900; color: #a5afbf; letter-spacing: .06em; text-transform: uppercase; }
+
+.settings-badge {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--red);
+  color: white;
+  font-style: normal;
+  font-size: 11px;
+  font-weight: 900;
+  display: grid;
+  place-items: center;
+  margin-left: 8px;
+}
+
+.reset-demo { margin-top: 14px; }
+
+/* ── Guest flow ────────────────────────────────────────────────────────── */
+
+.guest-privacy { margin: 12px 0 0; color: var(--muted); font-size: 12px; text-align: center; }
+.menu-list article.sold-out { opacity: .55; }
+.tracking-id { margin: 0; color: var(--muted); font-size: 12px; font-weight: 800; }

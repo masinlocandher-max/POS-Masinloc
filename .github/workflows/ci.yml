@@ -1,0 +1,33 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # `npm run build` runs tsc, vite build, and scripts/postbuild.mjs. The
+      # postbuild step fails the job if index.html ever again ships absolute or
+      # non-ASCII asset URLs — the defect that made the deployed app 404.
+      - run: npm run build
+
+      - name: Confirm the SPA fallback and Pages guard were emitted
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          test -f dist/.nojekyll
+          test -f dist/robots.txt
+          grep -q 'Disallow: /' dist/robots.txt
+          grep -q 'noindex' dist/index.html

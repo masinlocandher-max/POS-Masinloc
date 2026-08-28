@@ -68,13 +68,13 @@ function RegistrationGate({ children }: { children: ReactNode }) {
               <div><dt>Barangay / locality</dt><dd>{application.barangay}</dd></div>
               <div><dt>Business address</dt><dd>{application.address}</dd></div>
               <div><dt>Mobile</dt><dd>{application.mobile}</dd></div>
-              <div><dt>Verification file</dt><dd>{application.proofName}</dd></div>
+              <div><dt>Supporting file</dt><dd>{application.proofName || 'None submitted'}</dd></div>
             </dl>
           </section>
 
           <section className="why-review compact">
             <FileCheck2 />
-            <div><strong>Approval standard</strong><p>Verify that the applicant is Masinloqueño and the business is genuinely operating in Masinloc. Also check for duplicate or fraudulent registrations.</p></div>
+            <div><strong>Approval standard</strong><p>Verify that the applicant is Masinloqueño and the business is genuinely operating in Masinloc. Also check for duplicate or fraudulent registrations. Request supporting proof only when needed.</p></div>
           </section>
 
           {adminDecision === 'review' && <div className="admin-actions"><button className="reject-button" onClick={() => setAdminDecision('rejected')}><XCircle /> Reject</button><button className="approve-button" onClick={() => setAdminDecision('approved')}><BadgeCheck /> Approve Business</button></div>}
@@ -103,7 +103,7 @@ function RegistrationGate({ children }: { children: ReactNode }) {
           <div className="review-checklist">
             <div><CheckCircle2 /><span>Owner identity and Masinloqueño eligibility</span></div>
             <div><CheckCircle2 /><span>Business name and Masinloc location</span></div>
-            <div><CheckCircle2 /><span>Submitted verification document</span></div>
+            <div><CheckCircle2 /><span>Supporting proof only if verification needs it</span></div>
           </div>
           <button className="registration-secondary" onClick={() => setView('register')}>Edit registration</button>
         </main>
@@ -113,7 +113,7 @@ function RegistrationGate({ children }: { children: ReactNode }) {
 
   if (view === 'rejected') {
     return (
-      <div className="registration-shell"><header className="registration-header"><MasinlocBrand /></header><main className="registration-main pending-view"><div className="pending-icon rejected-icon"><XCircle /></div><h1>Registration needs attention.</h1><p className="registration-lead">Your application could not be verified. Update your registration details or verification document, then submit again.</p><button className="registration-primary" onClick={() => setView('register')}>Update Registration</button></main></div>
+      <div className="registration-shell"><header className="registration-header"><MasinlocBrand /></header><main className="registration-main pending-view"><div className="pending-icon rejected-icon"><XCircle /></div><h1>Registration needs attention.</h1><p className="registration-lead">Your application could not be verified. Update your registration details or provide supporting proof, then submit again.</p><button className="registration-primary" onClick={() => setView('register')}>Update Registration</button></main></div>
     )
   }
 
@@ -148,7 +148,7 @@ function RegistrationForm({ application, setApplication, onBack, onSubmit }: {
   onSubmit: () => void
 }) {
   const [confirmed, setConfirmed] = useState(false)
-  const canSubmit = Boolean(application.ownerName.trim() && application.businessName.trim() && application.barangay.trim() && application.address.trim() && application.mobile.trim() && application.proofName && confirmed)
+  const canSubmit = Boolean(application.ownerName.trim() && application.businessName.trim() && application.barangay.trim() && application.address.trim() && application.mobile.trim() && confirmed)
 
   const update = (key: keyof Application, value: string) => setApplication({ ...application, [key]: value })
   const submit = (event: FormEvent) => { event.preventDefault(); if (canSubmit) onSubmit() }
@@ -168,7 +168,7 @@ function RegistrationForm({ application, setApplication, onBack, onSubmit }: {
           <label><span>Barangay in Masinloc</span><input value={application.barangay} onChange={e => update('barangay', e.target.value)} placeholder="Barangay" /></label>
           <label><span>Business address</span><textarea value={application.address} onChange={e => update('address', e.target.value)} placeholder="Complete Masinloc business address" /></label>
           <label><span>Mobile number</span><input inputMode="tel" value={application.mobile} onChange={e => update('mobile', e.target.value)} placeholder="09XX XXX XXXX" /></label>
-          <label><span>Proof of local business / ownership</span><input className="file-input" type="file" accept="image/*,.pdf" onChange={e => update('proofName', e.target.files?.[0]?.name || '')} /><small>Business permit, barangay certification, or another document that helps verify the Masinloc business.</small></label>
+          <label><span>Supporting proof <em>(optional)</em></span><input className="file-input" type="file" accept="image/*,.pdf" onChange={e => update('proofName', e.target.files?.[0]?.name || '')} /><small>You may attach a business permit, barangay certification, or similar document. If the initial details are enough to verify the business, no file is required.</small></label>
 
           <section className="why-review compact form-review"><ShieldCheck /><div><strong>Why do we verify?</strong><p>This free service is reserved for Masinloqueño businesses. Review protects the community benefit from fake, duplicate and non-local registrations.</p></div></section>
 

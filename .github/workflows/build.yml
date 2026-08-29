@@ -23,7 +23,15 @@ jobs:
         run: npm install --no-audit --no-fund
       - name: Typecheck and build
         run: npm run build
-      - name: Upload production bundle
+      - name: Verify protected staging output
+        run: |
+          test -f dist/index.html
+          test -f dist/404.html
+          test -f dist/.nojekyll
+          test -f dist/robots.txt
+          grep -q 'noindex' dist/index.html
+          grep -q 'Disallow: /' dist/robots.txt
+      - name: Upload production candidate bundle
         uses: actions/upload-artifact@v4
         with:
           name: pos-production-dist

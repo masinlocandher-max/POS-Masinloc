@@ -1,0 +1,3 @@
+# Masinloc POS remains non-indexed until explicit launch approval.
+User-agent: *
+Disallow: /

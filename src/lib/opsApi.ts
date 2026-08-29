@@ -1,6 +1,8 @@
 import { supabase } from './supabase'
 import type { PaymentMethod } from './posApi'
 
+const DIGITAL_METHODS: PaymentMethod[] = ['gcash', 'maya', 'qrph']
+
 export type PaymentMethodRow = {
   id: string
   merchant_id: string
@@ -59,15 +61,23 @@ export async function getPaymentMethods(merchantId: string, outletId: string): P
 }
 
 export async function upsertPaymentMethod(input: Omit<PaymentMethodRow, 'id' | 'merchant_id' | 'outlet_id'> & { merchantId: string; outletId: string }) {
+  const digital = DIGITAL_METHODS.includes(input.method)
+  if (digital && !input.requires_manual_verification) {
+    throw new Error('Digital payments require manual verification in the current POS release.')
+  }
+  if (input.enabled && digital && !input.qr_image_path?.trim()) {
+    throw new Error('Upload a payment QR before enabling this digital payment method.')
+  }
+
   const { data, error } = await supabase.from('pos_payment_methods').upsert({
     merchant_id: input.merchantId,
     outlet_id: input.outletId,
     method: input.method,
-    label: input.label,
+    label: input.label.trim(),
     enabled: input.enabled,
     requires_manual_verification: input.requires_manual_verification,
-    qr_image_path: input.qr_image_path,
-    instructions: input.instructions,
+    qr_image_path: input.qr_image_path?.trim() || null,
+    instructions: input.instructions?.trim() || null,
     sort_order: input.sort_order,
   }, { onConflict: 'outlet_id,method' }).select().single()
   if (error) throw error

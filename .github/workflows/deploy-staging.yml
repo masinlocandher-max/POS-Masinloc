@@ -44,13 +44,34 @@ jobs:
             exit 1
           fi
 
+      # Pages is configured BEFORE the build so the build can bake in the real
+      # deployed sub-path. With a relative base, dist/404.html works at the
+      # site root and one level down, but a deeper URL resolves "./assets/"
+      # against the wrong directory and 404s. Declaring the base fixes the
+      # fallback at any depth. The relative default still covers hosts whose
+      # path cannot be declared, such as the non-ASCII /posmasinloqueño.
+      - uses: actions/configure-pages@v5
+        id: pages
+
+      - name: Resolve the base path for this host
+        env:
+          OVERRIDE: ${{ vars.BASE_PATH }}
+          PAGES_BASE: ${{ steps.pages.outputs.base_path }}
+        run: |
+          BASE="${OVERRIDE:-$PAGES_BASE}"
+          case "$BASE" in
+            ""|"/") BASE="/" ;;
+            */)     ;;
+            *)      BASE="$BASE/" ;;
+          esac
+          echo "VITE_BASE_PATH=$BASE" >> "$GITHUB_ENV"
+          echo "Building with base $BASE"
+
       - run: npm run build
         env:
-          VITE_BASE_PATH: ${{ vars.BASE_PATH }}
           VITE_STAGING_ACCESS_CODE: ${{ secrets.STAGING_ACCESS_CODE }}
           VITE_PUBLIC_LAUNCH: 'false'
 
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: dist

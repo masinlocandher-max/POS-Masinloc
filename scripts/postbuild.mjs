@@ -51,3 +51,15 @@ writeFileSync(join(dist, '.nojekyll'), '')
 console.log(`[postbuild] base="${declaredBase || './ (relative)'}"`)
 console.log(`[postbuild] verified ${assetRefs.length} asset reference(s): ${assetRefs.join(', ')}`)
 console.log('[postbuild] wrote dist/404.html and dist/.nojekyll')
+
+if (!declaredBase) {
+  // Worth stating plainly rather than discovering it in production: a relative
+  // base makes dist/ portable across hosts, but the 404.html fallback resolves
+  // "./assets/*" against the directory of whatever URL was requested. At the
+  // site root and one level down that is still the app directory, so the app
+  // boots. Two or more levels down it is not, and the fallback renders blank.
+  // The app has no router, so it never generates such a URL itself.
+  console.log('[postbuild] note: relative base — the 404.html fallback boots at the site root')
+  console.log('[postbuild]       and one level down. Declare VITE_BASE_PATH for a host whose')
+  console.log('[postbuild]       path is known and ASCII to make it work at any depth.')
+}

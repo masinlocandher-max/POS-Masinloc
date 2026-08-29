@@ -59,6 +59,27 @@ A deep link or a refreshed bookmark hit the host's own 404 page. `dist/404.html`
 (a copy of `index.html`) now covers that, and `dist/.nojekyll` stops GitHub
 Pages from dropping files whose names begin with an underscore.
 
+There is a subtlety here that testing caught. With a *relative* base, the
+fallback resolves `./assets/*` against the directory of whatever URL was
+requested, not the app root:
+
+| Requested URL | `./assets/` resolves to | Boots? |
+| --- | --- | --- |
+| `/POS-Masinloc/` | `/POS-Masinloc/assets/` | yes |
+| `/POS-Masinloc/orders` | `/POS-Masinloc/assets/` | yes |
+| `/POS-Masinloc/a/b` | `/POS-Masinloc/a/assets/` | **no** |
+
+So the deploy workflow now runs `actions/configure-pages` *before* the build
+and feeds the real deployed sub-path into `VITE_BASE_PATH`. The URLs become
+absolute and the fallback boots at any depth. The relative default is still
+what gets built everywhere else, because a host path that cannot be declared —
+`/posmasinloqueño`, with its non-ASCII segment — needs it.
+
+Public assets referenced from `index.html` (the manifest and the icons) are
+written as root-absolute paths (`/icons/...`), which is the Vite idiom: Vite
+rewrites them to whatever base the build declares. Written as `./icons/...`
+they are left untouched and break the same way.
+
 ### The guard against a repeat
 
 `scripts/postbuild.mjs` runs as part of `npm run build` and **fails the build**
@@ -81,7 +102,13 @@ it. Two things to arrange on the host:
    to the canonical path. Some keyboards, link shorteners, and printed QR
    codes will mangle the `ñ`.
 2. **Point the directory's 404 handler at `404.html`.** On GitHub Pages this is
-   automatic; on nginx use `error_page 404 /posmasinloqueño/404.html;`.
+   automatic; on nginx use `error_page 404 /posmasinloqueño/404.html;`. Because
+   this host's path cannot be declared as an ASCII base, the fallback boots at
+   the app root and one level down but not deeper — see the table above. If
+   deeper URLs matter here, rewrite them to the app root at the proxy
+   (`rewrite ^/posmasinloqueño/.+ /posmasinloqueño/ redirect;`) instead of
+   relying on `404.html`. The app has no router, so it never produces such a
+   URL itself.
 
 ## No public access yet
 
@@ -129,10 +156,10 @@ rights on the repository.
 3. **Run it.** Actions → Deploy staging → Run workflow, on `main`.
 
 The published URL will be `https://<owner>.github.io/<repo>/` — a sub-path,
-not the domain root. That works with no `BASE_PATH` set, because the base is
-relative; this is precisely the failure mode the 404 fix removed. Only set
-`BASE_PATH` if you later move the app to a host that demands absolute asset
-URLs, and keep the value ASCII.
+not the domain root. Leave `BASE_PATH` unset: the workflow reads the real
+sub-path from `actions/configure-pages` and builds against it, which is what
+makes the 404 fallback work at any depth. Set `BASE_PATH` only to override
+that for a different host, and keep the value ASCII.
 
 ### Opening to the public, later
 

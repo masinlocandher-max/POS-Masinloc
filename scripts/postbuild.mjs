@@ -1,18 +1,25 @@
+/**
+ * Post-build hardening for static hosting.
+ *
+ * The build remains private staging: it must stay noindex, use portable asset
+ * paths, and emit an SPA fallback plus .nojekyll for static hosts.
+ */
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const dist = join(process.cwd(), 'dist')
 const indexPath = join(dist, 'index.html')
-const expectedBase = (process.env.VITE_BASE_PATH || '/posmasinloqueno/').trim()
+const declaredBase = (process.env.VITE_BASE_PATH || '').trim()
+const expectedBase = declaredBase || './'
 
 if (!existsSync(indexPath)) {
-  console.error('[postbuild] dist/index.html is missing')
+  console.error('[postbuild] dist/index.html is missing — did `vite build` run?')
   process.exit(1)
 }
 
 if (expectedBase !== './') {
   if (!expectedBase.startsWith('/') || !expectedBase.endsWith('/') || /[^\x20-\x7E]/.test(expectedBase)) {
-    console.error('[postbuild] invalid VITE_BASE_PATH; use ./ or an ASCII absolute path ending in /')
+    console.error('[postbuild] VITE_BASE_PATH must be ./ or an ASCII absolute path ending in /')
     process.exit(1)
   }
 }
@@ -27,7 +34,7 @@ if (assetRefs.length === 0) {
 }
 
 const nonAscii = assetRefs.filter(ref => /[^\x20-\x7E]/.test(ref))
-if (nonAscii.length) {
+if (nonAscii.length > 0) {
   console.error('[postbuild] non-ASCII asset URL detected')
   nonAscii.forEach(ref => console.error(`  ${ref}`))
   process.exit(1)
@@ -35,13 +42,14 @@ if (nonAscii.length) {
 
 if (expectedBase === './') {
   const absolute = assetRefs.filter(ref => ref.startsWith('/'))
-  if (absolute.length) {
-    console.error('[postbuild] relative build emitted absolute assets')
+  if (absolute.length > 0) {
+    console.error('[postbuild] relative build emitted absolute asset URLs')
+    absolute.forEach(ref => console.error(`  ${ref}`))
     process.exit(1)
   }
 } else {
   const wrongBase = assetRefs.filter(ref => !ref.startsWith(expectedBase))
-  if (wrongBase.length) {
+  if (wrongBase.length > 0) {
     console.error(`[postbuild] asset URL escaped expected base ${expectedBase}`)
     wrongBase.forEach(ref => console.error(`  ${ref}`))
     process.exit(1)
@@ -55,5 +63,11 @@ if (!html.includes('noindex')) {
 
 writeFileSync(join(dist, '404.html'), html)
 writeFileSync(join(dist, '.nojekyll'), '')
-console.log(`[postbuild] verified ${assetRefs.length} asset reference(s) under ${expectedBase}`)
-console.log('[postbuild] wrote 404.html and .nojekyll')
+
+console.log(`[postbuild] base="${expectedBase}"`)
+console.log(`[postbuild] verified ${assetRefs.length} asset reference(s)`)
+console.log('[postbuild] wrote dist/404.html and dist/.nojekyll')
+
+if (!declaredBase) {
+  console.log('[postbuild] note: declare VITE_BASE_PATH on hosts that must support deep-link fallbacks at any URL depth')
+}

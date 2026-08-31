@@ -1,0 +1,87 @@
+name: Deploy staging
+
+# Manual only, on purpose. Masinloc POS is not open to the public yet, so no
+# push to any branch may publish it. Someone has to choose to run this, and the
+# published build is still locked behind the staging access code.
+#
+# Before the first run, add these repository secrets/variables:
+#   secret  STAGING_ACCESS_CODE  the code the team types to open the build
+#   var     BASE_PATH            usually empty; only set it if the host demands
+#                                absolute asset URLs (keep it ASCII)
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: staging-pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - run: npm ci
+
+      # The `secrets` context is not available in a step-level `if`, so the
+      # guard reads the value through env instead.
+      - name: Refuse to deploy without a staging access code
+        env:
+          STAGING_ACCESS_CODE: ${{ secrets.STAGING_ACCESS_CODE }}
+        run: |
+          if [ -z "$STAGING_ACCESS_CODE" ]; then
+            echo "STAGING_ACCESS_CODE is not set. Refusing to publish an unlocked build."
+            exit 1
+          fi
+
+      # Pages is configured BEFORE the build so the build can bake in the real
+      # deployed sub-path. With a relative base, dist/404.html works at the
+      # site root and one level down, but a deeper URL resolves "./assets/"
+      # against the wrong directory and 404s. Declaring the base fixes the
+      # fallback at any depth. The relative default still covers hosts whose
+      # path cannot be declared, such as the non-ASCII /posmasinloqueño.
+      - uses: actions/configure-pages@v5
+        id: pages
+
+      - name: Resolve the base path for this host
+        env:
+          OVERRIDE: ${{ vars.BASE_PATH }}
+          PAGES_BASE: ${{ steps.pages.outputs.base_path }}
+        run: |
+          BASE="${OVERRIDE:-$PAGES_BASE}"
+          case "$BASE" in
+            ""|"/") BASE="/" ;;
+            */)     ;;
+            *)      BASE="$BASE/" ;;
+          esac
+          echo "VITE_BASE_PATH=$BASE" >> "$GITHUB_ENV"
+          echo "Building with base $BASE"
+
+      - run: npm run build
+        env:
+          VITE_STAGING_ACCESS_CODE: ${{ secrets.STAGING_ACCESS_CODE }}
+          VITE_PUBLIC_LAUNCH: 'false'
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: staging
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

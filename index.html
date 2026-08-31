@@ -3,17 +3,36 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- Private staging build. Remove this tag only at public launch. -->
     <meta name="robots" content="noindex, nofollow, noarchive, nosnippet, noimageindex" />
-    <meta name="theme-color" content="#0D3B9E" />
-    <meta name="color-scheme" content="light" />
-    <meta name="description" content="Masinloc POS — mobile-first restaurant ordering, POS, kitchen, chat and loyalty." />
-    <meta name="format-detection" content="telephone=no" />
+
     <title>Masinloc POS</title>
+    <meta name="description" content="Masinloc POS — mobile-first restaurant ordering, POS, kitchen, chat and loyalty." />
+
+    <meta name="theme-color" content="#0d3b9e" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0a2f7d" media="(prefers-color-scheme: dark)" />
+    <meta name="color-scheme" content="light" />
+
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+
+    <!-- Home-screen install on iOS -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Masinloc POS" />
+    <meta name="mobile-web-app-capable" content="yes" />
+
+    <!-- Phone numbers in order notes should not become tap-to-call links. -->
+    <meta name="format-detection" content="telephone=no" />
   </head>
   <body>
     <div id="root"></div>
     <noscript>
-      <div style="padding:24px;font:16px/1.5 system-ui,sans-serif">Masinloc POS needs JavaScript enabled.</div>
+      <div style="padding:24px;font:16px/1.5 system-ui,sans-serif">
+        Masinloc POS needs JavaScript enabled.
+      </div>
     </noscript>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -1,11 +1,14 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const DEFAULT_BASE = '/posmasinloqueno/'
-
+/**
+ * Default to a relative base so one build works at the root or any subpath.
+ * A host can declare an ASCII absolute VITE_BASE_PATH when deep-link fallback
+ * behavior requires a known deployment path.
+ */
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const base = env.VITE_BASE_PATH?.trim() || DEFAULT_BASE
+  const base = env.VITE_BASE_PATH?.trim() || './'
 
   if (base !== './') {
     if (!base.startsWith('/') || !base.endsWith('/')) {

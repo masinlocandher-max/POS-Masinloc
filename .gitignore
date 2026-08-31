@@ -4,3 +4,10 @@ dist
 .env.*
 !.env.example
 .DS_Store
+
+# tsc -b artefacts. A misconfigured tsconfig once emitted vite.config.js next
+# to vite.config.ts; Vite resolves the .js first, so the stale compiled config
+# silently overrode the real one. Keep these out of the tree.
+*.tsbuildinfo
+/vite.config.js
+/vite.config.d.ts

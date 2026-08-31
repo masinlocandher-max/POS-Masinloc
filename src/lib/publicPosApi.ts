@@ -1,4 +1,4 @@
-import { posOrderEndpoint, supabase, supabasePublishableKey, supabaseUrl } from './supabase'
+import { posOrderEndpoint, supabasePublishableKey, supabaseUrl } from './supabase'
 import type { Fulfillment, OrderStatus, PaymentMethod, PaymentStatus, PublicMenuCategory, PublicStorefront } from './posApi'
 
 type PublicPaymentMethod = {
@@ -11,7 +11,7 @@ type PublicPaymentMethod = {
 }
 
 export type StorefrontPayload = {
-  store: Omit<PublicStorefront, 'payment_methods'> & { payment_methods: PublicPaymentMethod[] }
+  store: Omit<PublicStorefront, 'payment_methods'> & { payment_methods: PublicPaymentMethod[]; marketplace_lead_time_minutes?: number }
   menu: PublicMenuCategory[]
 }
 
@@ -27,27 +27,14 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
 
 export async function loadStorefront(slug: string): Promise<StorefrontPayload> {
   const source = new URLSearchParams(window.location.search).get('source') === 'marketplace' ? 'marketplace' : 'qr'
-  const response = await fetch(`${storefrontEndpoint}?slug=${encodeURIComponent(slug)}`, {
+  const response = await fetch(`${storefrontEndpoint}?slug=${encodeURIComponent(slug)}&source=${source}`, {
     headers: { apikey: supabasePublishableKey },
     referrerPolicy: 'strict-origin-when-cross-origin',
   })
   const body = await readJson(response)
   if (!response.ok || body.ok !== true) throw new Error(typeof body.error === 'string' ? body.error : 'Store unavailable')
   if (!body.store || typeof body.store !== 'object') throw new Error('Store unavailable')
-
-  let menu = Array.isArray(body.menu) ? body.menu as PublicMenuCategory[] : []
-  if (source === 'marketplace') {
-    const [{ data: marketplaceStore, error: storeError }, { data: marketplaceMenu, error: menuError }] = await Promise.all([
-      supabase.rpc('pos_marketplace_storefront', { p_slug: slug }),
-      supabase.rpc('pos_public_marketplace_menu', { p_slug: slug }),
-    ])
-    if (storeError) throw storeError
-    if (menuError) throw menuError
-    if (!marketplaceStore) throw new Error('Marketplace ordering is not enabled for this store.')
-    menu = (marketplaceMenu || []) as PublicMenuCategory[]
-  }
-
-  return { store: body.store as StorefrontPayload['store'], menu }
+  return { store: body.store as StorefrontPayload['store'], menu: Array.isArray(body.menu) ? body.menu as PublicMenuCategory[] : [] }
 }
 
 function guestClientId() {

@@ -1,0 +1,1 @@
+CI build verification for remaining POS operations.

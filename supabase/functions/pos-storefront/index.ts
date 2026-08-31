@@ -38,65 +38,45 @@ function validSlug(value: string) {
 Deno.serve(async (req) => {
   const h = headers(req);
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: h });
-
   const origin = req.headers.get("origin") || "";
-  if (!originAllowed(origin)) {
-    return new Response(JSON.stringify({ ok: false, error: "Origin not allowed" }), { status: 403, headers: h });
-  }
-  if (req.method !== "GET") {
-    return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), { status: 405, headers: h });
-  }
+  if (!originAllowed(origin)) return new Response(JSON.stringify({ ok: false, error: "Origin not allowed" }), { status: 403, headers: h });
+  if (req.method !== "GET") return new Response(JSON.stringify({ ok: false, error: "Method not allowed" }), { status: 405, headers: h });
 
   try {
     const url = new URL(req.url);
     const slug = (url.searchParams.get("slug") || "").trim().toLowerCase();
-    if (!validSlug(slug)) {
-      return new Response(JSON.stringify({ ok: false, error: "Invalid store" }), { status: 400, headers: h });
-    }
+    const source = url.searchParams.get("source") === "marketplace" ? "marketplace" : "qr";
+    if (!validSlug(slug)) return new Response(JSON.stringify({ ok: false, error: "Invalid store" }), { status: 400, headers: h });
 
+    const storeRpc = source === "marketplace" ? "pos_marketplace_storefront" : "pos_public_storefront";
+    const menuRpc = source === "marketplace" ? "pos_public_marketplace_menu" : "pos_public_menu";
     const [{ data: store, error: storeError }, { data: menu, error: menuError }] = await Promise.all([
-      supabase.rpc("pos_public_storefront", { p_slug: slug }),
-      supabase.rpc("pos_public_menu", { p_slug: slug }),
+      supabase.rpc(storeRpc, { p_slug: slug }),
+      supabase.rpc(menuRpc, { p_slug: slug }),
     ]);
 
     if (storeError || menuError) {
       console.error("pos_storefront_db", storeError?.message || menuError?.message);
       throw new Error("SERVER");
     }
-    if (!store) {
-      return new Response(JSON.stringify({ ok: false, error: "Store unavailable" }), { status: 404, headers: h });
-    }
+    if (!store) return new Response(JSON.stringify({ ok: false, error: source === "marketplace" ? "Marketplace ordering is unavailable for this store" : "Store unavailable" }), { status: 404, headers: h });
 
     const paymentMethods: Array<Record<string, unknown>> = [];
     for (const method of (store.payment_methods || [])) {
       let qrUrl: string | null = null;
       if (method.qr_image_path) {
-        const { data, error } = await supabase.storage
-          .from("pos-payment-assets")
-          .createSignedUrl(method.qr_image_path, 600);
-        if (error) {
-          console.error("pos_storefront_qr_sign", error.message);
-        } else {
-          qrUrl = data.signedUrl;
-        }
+        const { data, error } = await supabase.storage.from("pos-payment-assets").createSignedUrl(method.qr_image_path, 600);
+        if (error) console.error("pos_storefront_qr_sign", error.message); else qrUrl = data.signedUrl;
       }
-
-      paymentMethods.push({
-        method: method.method,
-        label: method.label,
-        requires_manual_verification: method.requires_manual_verification,
-        instructions: method.instructions || null,
-        qr_url: qrUrl,
-      });
+      paymentMethods.push({ method: method.method, label: method.label, requires_manual_verification: method.requires_manual_verification, instructions: method.instructions || null, qr_url: qrUrl });
     }
 
     const publicStore = {
-      name: store.name,
-      slug: store.slug,
-      currency: store.currency,
+      name: store.name, slug: store.slug, currency: store.currency,
+      marketplace_lead_time_minutes: Number(store.marketplace_lead_time_minutes || 0),
       outlet: {
         name: store.outlet?.name,
-        dine_in_enabled: Boolean(store.outlet?.dine_in_enabled),
+        dine_in_enabled: source === "marketplace" ? false : Boolean(store.outlet?.dine_in_enabled),
         pickup_enabled: Boolean(store.outlet?.pickup_enabled),
         delivery_enabled: Boolean(store.outlet?.delivery_enabled),
         delivery_fee: Number(store.outlet?.delivery_fee || 0),
@@ -104,11 +84,7 @@ Deno.serve(async (req) => {
       },
       payment_methods: paymentMethods,
     };
-
-    return new Response(JSON.stringify({ ok: true, store: publicStore, menu: menu || [] }), {
-      status: 200,
-      headers: headers(req, "private, max-age=30"),
-    });
+    return new Response(JSON.stringify({ ok: true, source, store: publicStore, menu: menu || [] }), { status: 200, headers: headers(req, "private, max-age=30") });
   } catch (err) {
     console.error("pos_storefront_error", err instanceof Error ? err.message : "unknown");
     return new Response(JSON.stringify({ ok: false, error: "We could not load this store right now." }), { status: 500, headers: h });

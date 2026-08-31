@@ -3,6 +3,7 @@ import MerchantApp from './MerchantApp'
 import OperationsHub from './OperationsHub'
 import RegistrationGate from './RegistrationGate'
 import RetailWorkspace from './RetailWorkspace'
+import './advancedOps.css'
 
 export default function App() {
   const params = new URLSearchParams(window.location.search)

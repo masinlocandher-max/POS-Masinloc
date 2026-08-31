@@ -19,6 +19,37 @@ export type MerchantContext = {
   outlet_name: string | null
 }
 
+export type AccessApplicationStatus = 'submitted' | 'under_review' | 'needs_changes' | 'approved' | 'rejected'
+
+export type AccessApplication = {
+  id: string
+  contact_email: string
+  owner_name: string
+  business_name: string
+  business_type: string
+  barangay: string
+  business_address: string
+  mobile: string
+  eligibility_confirmed: boolean
+  status: AccessApplicationStatus
+  review_notes: string | null
+  merchant_id: string | null
+  submitted_at: string
+  reviewed_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type AccessApplicationInput = {
+  ownerName: string
+  businessName: string
+  businessType: string
+  barangay: string
+  businessAddress: string
+  mobile: string
+  eligibilityConfirmed: boolean
+}
+
 export type PlanLimits = {
   plan_code: string
   product_limit: number
@@ -158,10 +189,61 @@ export const authApi = {
     if (error) throw error
     return data.session
   },
+  signUp: async (email: string, password: string) => {
+    const { data, error } = await supabase.auth.signUp({ email, password })
+    if (error) throw error
+    return data
+  },
   signOut: async () => {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
   },
+}
+
+export async function getAccessApplication(): Promise<AccessApplication | null> {
+  const { data, error } = await supabase.rpc('pos_my_access_application')
+  if (error) throw error
+  return (data || null) as AccessApplication | null
+}
+
+export async function isPlatformAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.rpc('pos_is_platform_admin')
+  if (error) throw error
+  return data === true
+}
+
+export async function getAccessApplicationsForReview(): Promise<AccessApplication[]> {
+  const { data, error } = await supabase
+    .from('pos_access_applications')
+    .select('id,contact_email,owner_name,business_name,business_type,barangay,business_address,mobile,eligibility_confirmed,status,review_notes,merchant_id,submitted_at,reviewed_at,created_at,updated_at')
+    .order('submitted_at', { ascending: false })
+    .limit(200)
+  if (error) throw error
+  return (data || []) as AccessApplication[]
+}
+
+export async function reviewAccessApplication(applicationId: string, decision: Exclude<AccessApplicationStatus, 'submitted'>, reason?: string) {
+  const { data, error } = await supabase.rpc('pos_admin_review_access_application', {
+    p_application_id: applicationId,
+    p_decision: decision,
+    p_reason: reason?.trim() || null,
+  })
+  if (error) throw error
+  return data as { application_id: string; status: AccessApplicationStatus; merchant_id: string | null }
+}
+
+export async function submitAccessApplication(input: AccessApplicationInput) {
+  const { data, error } = await supabase.rpc('pos_submit_access_application', {
+    p_owner_name: input.ownerName,
+    p_business_name: input.businessName,
+    p_business_type: input.businessType,
+    p_barangay: input.barangay,
+    p_business_address: input.businessAddress,
+    p_mobile: input.mobile,
+    p_eligibility_confirmed: input.eligibilityConfirmed,
+  })
+  if (error) throw error
+  return data as { id: string; status: AccessApplicationStatus; submitted_at: string }
 }
 
 export async function getMerchantContexts(): Promise<MerchantContext[]> {

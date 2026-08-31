@@ -1,7 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
 import { MessageCircle, Send, X } from 'lucide-react'
 import { supabase } from './lib/supabase'
-import { getMerchantContexts, type MerchantContext, type OrderStatus } from './lib/posApi'
+import { type MerchantContext, type OrderStatus } from './lib/posApi'
 import './staff-chat.css'
 
 type ChatOrder = {
@@ -29,9 +29,7 @@ function messageOf(error: unknown) {
   return 'Chat is unavailable right now.'
 }
 
-export default function StaffChatOverlay() {
-  const [context, setContext] = useState<MerchantContext | null>(null)
-  const [userId, setUserId] = useState<string | null>(null)
+export default function StaffChatOverlay({ context, userId }: { context: MerchantContext; userId: string }) {
   const [orders, setOrders] = useState<ChatOrder[]>([])
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null)
@@ -40,7 +38,6 @@ export default function StaffChatOverlay() {
   const [error, setError] = useState('')
   const [sending, setSending] = useState(false)
 
-  const isGuestStorefront = useMemo(() => new URLSearchParams(window.location.search).has('store'), [])
   const selected = orders.find(order => order.id === selectedOrderId) || null
 
   const loadOrders = async (merchantId: string) => {
@@ -70,50 +67,31 @@ export default function StaffChatOverlay() {
   }
 
   useEffect(() => {
-    if (isGuestStorefront) return
-    let cancelled = false
-
-    const boot = async () => {
-      try {
-        const { data, error: sessionError } = await supabase.auth.getSession()
-        if (sessionError) throw sessionError
-        if (cancelled) return
-        setUserId(data.session?.user.id || null)
-        if (!data.session) { setContext(null); return }
-        const contexts = await getMerchantContexts()
-        if (cancelled) return
-        const next = contexts[0] || null
-        setContext(next)
-        if (next) await loadOrders(next.merchant_id)
-      } catch (err) {
-        if (!cancelled) setError(messageOf(err))
-      }
-    }
-
-    void boot()
-    const { data: authSub } = supabase.auth.onAuthStateChange(() => void boot())
-    return () => { cancelled = true; authSub.subscription.unsubscribe() }
-  }, [isGuestStorefront])
+    setOrders([])
+    setMessages([])
+    setSelectedOrderId(null)
+    setOpen(false)
+    setDraft('')
+    setError('')
+    void loadOrders(context.merchant_id).catch(err => setError(messageOf(err)))
+  }, [context.merchant_id])
 
   useEffect(() => {
-    if (!context) return
     const channel = supabase
       .channel(`pos-staff-chat-${context.merchant_id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_chat_messages', filter: `merchant_id=eq.${context.merchant_id}` }, payload => {
         const row = payload.new as Partial<ChatMessage>
-        if (row.order_id === selectedOrderId && selectedOrderId) void loadMessages(context.merchant_id, selectedOrderId)
+        if (row.order_id === selectedOrderId && selectedOrderId) void loadMessages(context.merchant_id, selectedOrderId).catch(err => setError(messageOf(err)))
       })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pos_orders', filter: `merchant_id=eq.${context.merchant_id}` }, () => void loadOrders(context.merchant_id))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pos_orders', filter: `merchant_id=eq.${context.merchant_id}` }, () => void loadOrders(context.merchant_id).catch(err => setError(messageOf(err))))
       .subscribe()
     return () => { void supabase.removeChannel(channel) }
   }, [context?.merchant_id, selectedOrderId])
 
   useEffect(() => {
-    if (!context || !selectedOrderId) { setMessages([]); return }
+    if (!selectedOrderId) { setMessages([]); return }
     void loadMessages(context.merchant_id, selectedOrderId).catch(err => setError(messageOf(err)))
   }, [context?.merchant_id, selectedOrderId])
-
-  if (isGuestStorefront || !context || !userId) return null
 
   const send = async (event: FormEvent) => {
     event.preventDefault()
@@ -140,17 +118,17 @@ export default function StaffChatOverlay() {
   }
 
   return <>
-    <button className="staff-chat-launcher" onClick={() => setOpen(value => !value)} aria-label="Order chat">
+    <button className="staff-chat-launcher" onClick={() => setOpen(value => !value)} aria-label="Order chat" aria-expanded={open} aria-controls="staff-chat-panel">
       <MessageCircle />
       {orders.length > 0 && <span>{orders.length > 99 ? '99+' : orders.length}</span>}
     </button>
 
-    {open && <section className="staff-chat-panel" aria-label="Order chat panel">
+    {open && <section id="staff-chat-panel" className="staff-chat-panel" aria-label="Order chat panel">
       <header><div><strong>Order chat</strong><small>{context.merchant_name}</small></div><button onClick={() => setOpen(false)} aria-label="Close chat"><X /></button></header>
       {error && <div className="staff-chat-error">{error}</div>}
       {orders.length === 0 ? <div className="staff-chat-empty"><MessageCircle /><strong>No open order chats.</strong><span>Completed and cancelled orders are closed automatically.</span></div> : <>
         <div className="staff-chat-orders" role="tablist" aria-label="Open orders">
-          {orders.map(order => <button key={order.id} className={order.id === selectedOrderId ? 'active' : ''} onClick={() => setSelectedOrderId(order.id)}>
+          {orders.map(order => <button key={order.id} role="tab" aria-selected={order.id === selectedOrderId} className={order.id === selectedOrderId ? 'active' : ''} onClick={() => setSelectedOrderId(order.id)}>
             <strong>#{order.order_number}</strong><span>{order.customer_name}</span><small>{order.status.replaceAll('_', ' ')}</small>
           </button>)}
         </div>

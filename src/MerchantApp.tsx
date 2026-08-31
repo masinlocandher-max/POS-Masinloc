@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useMemo, useState } from 'react'
 import { Archive, BadgeCheck, Banknote, Boxes, ChefHat, ClipboardList, Clock3, Home, LogIn, LogOut, Menu as MenuIcon, Minus, PackagePlus, Plus, RefreshCw, ShieldCheck, ShoppingCart, Store, Users, WalletCards } from 'lucide-react'
 import { supabase } from './lib/supabase'
 import MarketplaceProfileTool from './MarketplaceProfileTool'
+import StaffChatOverlay from './StaffChatOverlay'
 import {
   advanceOrder,
   archiveProduct,
@@ -60,8 +61,7 @@ export default function MerchantApp() {
   const [tab, setTab] = useState<Tab>('home')
   const [tool, setTool] = useState<Tool>('overview')
   const [booting, setBooting] = useState(true)
-  const [session, setSession] = useState(false)
-  const [contexts, setContexts] = useState<MerchantContext[]>([])
+  const [userId, setUserId] = useState<string | null>(null)
   const [context, setContext] = useState<MerchantContext | null>(null)
   const [dashboard, setDashboard] = useState<DashboardData | null>(null)
   const [orders, setOrders] = useState<OrderRow[]>([])
@@ -96,10 +96,9 @@ export default function MerchantApp() {
     setBooting(true); setError('')
     try {
       const current = await authApi.session()
-      setSession(Boolean(current))
-      if (!current) { setContexts([]); setContext(null); return }
+      setUserId(current?.user.id || null)
+      if (!current) { setContext(null); return }
       const nextContexts = await getMerchantContexts()
-      setContexts(nextContexts)
       if (nextContexts.length) await loadMerchant(nextContexts[0])
       else setContext(null)
     } catch (e) { setError(messageOf(e)) }
@@ -124,8 +123,8 @@ export default function MerchantApp() {
 
   if (booting) return <div className="app-shell"><div className="center-state full"><div className="spinner" /><strong>Connecting to Masinloc POS…</strong></div></div>
 
-  const reviewMode = !session
-  const noMerchant = session && !context
+  const reviewMode = !userId
+  const noMerchant = Boolean(userId) && !context
   return <div className="app-shell">
     <header className="topbar"><Brand /><div className="top-actions">{context && <span className="role-pill">{context.role}</span>}{reviewMode ? <button className="ghost-action" onClick={() => setShowSignIn(true)}><LogIn /> Sign in</button> : <button className="icon-button" title="Sign out" onClick={() => void authApi.signOut()}><LogOut /></button>}</div></header>
     {reviewMode && <div className="review-banner"><ShieldCheck /><div><strong>Review mode · Supabase connected</strong><span>No merchant, sales, products, orders, or customer records are being fabricated for this preview.</span></div></div>}
@@ -142,6 +141,7 @@ export default function MerchantApp() {
     </main>
 
     <nav className="bottom-nav"><Nav active={tab === 'home'} icon={<Home />} label="Home" onClick={() => setTab('home')} /><Nav active={tab === 'orders'} icon={<ClipboardList />} label="Orders" onClick={() => setTab('orders')} /><Nav active={tab === 'pos'} icon={<Store />} label="POS" onClick={() => setTab('pos')} /><Nav active={tab === 'customers'} icon={<Users />} label="Customers" onClick={() => setTab('customers')} /><Nav active={tab === 'more'} icon={<MenuIcon />} label="More" onClick={() => setTab('more')} /></nav>
+    {context && userId && <StaffChatOverlay context={context} userId={userId} />}
     {showSignIn && <SignIn onClose={() => setShowSignIn(false)} onError={setError} />}
   </div>
 }

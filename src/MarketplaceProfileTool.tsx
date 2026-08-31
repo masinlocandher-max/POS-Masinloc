@@ -91,7 +91,14 @@ export default function MarketplaceProfileTool({ context, onError, onNotice }: {
     finally { setSaving(false) }
   }
 
+  const publishedCount = products.filter(product => product.marketplace_published).length
+  const marketplaceLimit = context.plan_code === 'community_free' ? 20 : null
+
   const toggleProduct = async (product: MarketplaceProduct) => {
+    if (!product.marketplace_published && marketplaceLimit !== null && publishedCount >= marketplaceLimit) {
+      onError(`Community Free can publish up to ${marketplaceLimit} Marketplace products. Unpublish another item or upgrade after your paid plan is activated.`)
+      return
+    }
     try {
       await setMarketplaceProduct({
         productId: product.id,
@@ -152,12 +159,16 @@ export default function MarketplaceProfileTool({ context, onError, onNotice }: {
     <div className="stack-form">
       <h3>Products sold on Marketplace</h3>
       <p className="body-copy">Only products switched on here can be ordered from Marketplace. Walk-in POS products remain unaffected.</p>
+      {marketplaceLimit !== null && <div className="usage"><span>Community Free Marketplace slots</span><strong>{publishedCount} / {marketplaceLimit}</strong><progress max={marketplaceLimit} value={publishedCount} /></div>}
       <div className="settings-list">
-        {products.map(product => <div key={product.id} className="marketplace-product-row">
-          <div className="settings-copy"><strong>{product.name}</strong><small>{money(Number(product.price))} POS · {product.track_inventory ? `${product.stock_on_hand} in stock` : 'stock not tracked'}{!settings.marketplace_same_price ? ` · ${money(Number(product.marketplace_price ?? product.price))} Marketplace` : ''}</small></div>
-          {!settings.marketplace_same_price && <button type="button" className="secondary small" onClick={() => void editMarketplacePrice(product)}>Price</button>}
-          <label className="switch-inline"><input type="checkbox" checked={product.marketplace_published} onChange={() => void toggleProduct(product)} /><span>{product.marketplace_published ? 'Live' : 'Off'}</span></label>
-        </div>)}
+        {products.map(product => {
+          const publishBlocked = !product.marketplace_published && marketplaceLimit !== null && publishedCount >= marketplaceLimit
+          return <div key={product.id} className="marketplace-product-row">
+            <div className="settings-copy"><strong>{product.name}</strong><small>{money(Number(product.price))} POS · {product.track_inventory ? `${product.stock_on_hand} in stock` : 'stock not tracked'}{!settings.marketplace_same_price ? ` · ${money(Number(product.marketplace_price ?? product.price))} Marketplace` : ''}</small></div>
+            {!settings.marketplace_same_price && <button type="button" className="secondary small" onClick={() => void editMarketplacePrice(product)}>Price</button>}
+            <label className="switch-inline"><input type="checkbox" disabled={publishBlocked} checked={product.marketplace_published} onChange={() => void toggleProduct(product)} /><span>{product.marketplace_published ? 'Live' : publishBlocked ? 'Limit' : 'Off'}</span></label>
+          </div>
+        })}
       </div>
     </div>
   </div>

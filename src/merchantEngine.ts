@@ -22,6 +22,7 @@ export type MerchantVertical =
 export type Capability =
   | 'pos'
   | 'qr_ordering'
+  | 'marketplace_selling'
   | 'customer_records'
   | 'basic_loyalty'
   | 'basic_reports'
@@ -69,7 +70,7 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
     maxStaff: 3,
     maxProducts: 100,
     capabilities: [
-      'pos', 'qr_ordering', 'customer_records', 'basic_loyalty',
+      'pos', 'qr_ordering', 'marketplace_selling', 'customer_records', 'basic_loyalty',
       'basic_reports', 'basic_inventory', 'expense_tracking', 'kitchen_workflow',
     ],
   },
@@ -82,7 +83,7 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
     maxStaff: 10,
     maxProducts: 1000,
     capabilities: [
-      'pos', 'qr_ordering', 'customer_records', 'basic_loyalty', 'basic_reports',
+      'pos', 'qr_ordering', 'marketplace_selling', 'customer_records', 'basic_loyalty', 'basic_reports',
       'basic_inventory', 'expense_tracking', 'barcode_scanning', 'thermal_printing',
       'multiple_printers', 'inventory_history', 'inventory_adjustments', 'low_stock_alerts',
       'suppliers', 'kitchen_workflow', 'staff_accounts', 'discount_controls',
@@ -98,7 +99,7 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
     maxStaff: 'unlimited',
     maxProducts: 'unlimited',
     capabilities: [
-      'pos', 'qr_ordering', 'customer_records', 'basic_loyalty', 'basic_reports',
+      'pos', 'qr_ordering', 'marketplace_selling', 'customer_records', 'basic_loyalty', 'basic_reports',
       'basic_inventory', 'expense_tracking', 'barcode_scanning', 'thermal_printing',
       'multiple_printers', 'inventory_history', 'inventory_adjustments', 'low_stock_alerts',
       'suppliers', 'purchase_orders', 'kitchen_workflow', 'staff_accounts', 'discount_controls',
@@ -107,6 +108,33 @@ export const PLAN_DEFINITIONS: Record<PlanTier, PlanDefinition> = {
       'priority_support',
     ],
   },
+}
+
+export type MarketplacePriceMode = 'same_as_pos' | 'custom'
+export type MarketplaceStockMode = 'live_inventory' | 'manual_availability'
+
+export type MarketplaceSettings = {
+  enabled: boolean
+  storefrontVisible: boolean
+  autoPublishNewProducts: boolean
+  hideOutOfStock: boolean
+  priceMode: MarketplacePriceMode
+  stockMode: MarketplaceStockMode
+  allowPickup: boolean
+  allowDelivery: boolean
+  minimumOrder?: number
+  orderLeadTimeMinutes?: number
+}
+
+export const DEFAULT_MARKETPLACE_SETTINGS: MarketplaceSettings = {
+  enabled: false,
+  storefrontVisible: false,
+  autoPublishNewProducts: false,
+  hideOutOfStock: true,
+  priceMode: 'same_as_pos',
+  stockMode: 'live_inventory',
+  allowPickup: true,
+  allowDelivery: false,
 }
 
 export type ProductRecord = {
@@ -121,6 +149,11 @@ export type ProductRecord = {
   stockOnHand?: number
   lowStockThreshold?: number
   available: boolean
+  publishToMarketplace?: boolean
+  marketplacePrice?: number
+  marketplaceTitle?: string
+  marketplaceDescription?: string
+  marketplaceImageUrl?: string
 }
 
 export type InventoryMovementReason =
@@ -195,4 +228,22 @@ export const inventoryValue = (products: ProductRecord[]) =>
 export const daysOfStockRemaining = (stockOnHand: number, averageDailyUsage: number) => {
   if (averageDailyUsage <= 0) return null
   return stockOnHand / averageDailyUsage
+}
+
+export const marketplacePriceFor = (
+  product: ProductRecord,
+  settings: MarketplaceSettings,
+) => settings.priceMode === 'custom' && product.marketplacePrice != null
+  ? product.marketplacePrice
+  : product.price
+
+export const isMarketplaceSellable = (
+  product: ProductRecord,
+  settings: MarketplaceSettings,
+) => {
+  if (!settings.enabled || !settings.storefrontVisible || !product.publishToMarketplace || !product.available) return false
+  if (settings.stockMode === 'live_inventory' && settings.hideOutOfStock && product.trackInventory) {
+    return (product.stockOnHand ?? 0) > 0
+  }
+  return true
 }

@@ -45,6 +45,7 @@ export default function StaffChatOverlay({ context, userId }: { context: Merchan
       .from('pos_orders')
       .select('id,order_number,customer_name,status,updated_at')
       .eq('merchant_id', merchantId)
+      .eq('payment_status', 'paid')
       .not('status', 'in', '(completed,cancelled)')
       .order('updated_at', { ascending: false })
       .limit(100)
@@ -52,6 +53,7 @@ export default function StaffChatOverlay({ context, userId }: { context: Merchan
     const next = (data || []) as ChatOrder[]
     setOrders(next)
     setSelectedOrderId(current => current && next.some(order => order.id === current) ? current : next[0]?.id || null)
+    if (!next.length) setOpen(false)
   }
 
   const loadMessages = async (merchantId: string, orderId: string) => {
@@ -117,31 +119,31 @@ export default function StaffChatOverlay({ context, userId }: { context: Merchan
     }
   }
 
+  if (orders.length === 0) return null
+
   return <>
-    <button className="staff-chat-launcher" onClick={() => setOpen(value => !value)} aria-label="Order chat" aria-expanded={open} aria-controls="staff-chat-panel">
+    <button className="staff-chat-launcher" onClick={() => setOpen(value => !value)} aria-label="Paid order messages" aria-expanded={open} aria-controls="staff-chat-panel">
       <MessageCircle />
-      {orders.length > 0 && <span>{orders.length > 99 ? '99+' : orders.length}</span>}
+      <span>{orders.length > 99 ? '99+' : orders.length}</span>
     </button>
 
-    {open && <section id="staff-chat-panel" className="staff-chat-panel" aria-label="Order chat panel">
-      <header><div><strong>Order chat</strong><small>{context.merchant_name}</small></div><button onClick={() => setOpen(false)} aria-label="Close chat"><X /></button></header>
+    {open && <section id="staff-chat-panel" className="staff-chat-panel" aria-label="Paid order messages">
+      <header><div><strong>Order messages</strong><small>{context.merchant_name} · paid orders only</small></div><button onClick={() => setOpen(false)} aria-label="Close messages"><X /></button></header>
       {error && <div className="staff-chat-error">{error}</div>}
-      {orders.length === 0 ? <div className="staff-chat-empty"><MessageCircle /><strong>No open order chats.</strong><span>Completed and cancelled orders are closed automatically.</span></div> : <>
-        <div className="staff-chat-orders" role="tablist" aria-label="Open orders">
-          {orders.map(order => <button key={order.id} role="tab" aria-selected={order.id === selectedOrderId} className={order.id === selectedOrderId ? 'active' : ''} onClick={() => setSelectedOrderId(order.id)}>
-            <strong>#{order.order_number}</strong><span>{order.customer_name}</span><small>{order.status.replaceAll('_', ' ')}</small>
-          </button>)}
-        </div>
-        <div className="staff-chat-thread">
-          {messages.length === 0 ? <p className="staff-chat-no-message">No messages yet.</p> : messages.map(item => <div key={item.id} className={`staff-chat-message ${item.sender_type}`}>
-            <span>{item.message}</span><small>{item.sender_type === 'staff' ? 'Store' : item.sender_type === 'customer' ? 'Customer' : 'System'} · {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
-          </div>)}
-        </div>
-        <form className="staff-chat-compose" onSubmit={send}>
-          <input value={draft} maxLength={1000} onChange={event => setDraft(event.target.value)} placeholder="Reply to this order" aria-label="Reply to order" />
-          <button className="primary" disabled={sending || !draft.trim()} aria-label="Send reply"><Send /></button>
-        </form>
-      </>}
+      <div className="staff-chat-orders" role="tablist" aria-label="Paid open orders">
+        {orders.map(order => <button key={order.id} role="tab" aria-selected={order.id === selectedOrderId} className={order.id === selectedOrderId ? 'active' : ''} onClick={() => setSelectedOrderId(order.id)}>
+          <strong>#{order.order_number}</strong><span>{order.customer_name}</span><small>{order.status.replaceAll('_', ' ')}</small>
+        </button>)}
+      </div>
+      <div className="staff-chat-thread">
+        {messages.length === 0 ? <p className="staff-chat-no-message">No messages yet.</p> : messages.map(item => <div key={item.id} className={`staff-chat-message ${item.sender_type}`}>
+          <span>{item.message}</span><small>{item.sender_type === 'staff' ? 'Store' : item.sender_type === 'customer' ? 'Customer' : 'System'} · {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
+        </div>)}
+      </div>
+      <form className="staff-chat-compose" onSubmit={send}>
+        <input value={draft} maxLength={1000} onChange={event => setDraft(event.target.value)} placeholder="Reply to this order" aria-label="Reply to order" />
+        <button className="primary" disabled={sending || !draft.trim()} aria-label="Send reply"><Send /></button>
+      </form>
     </section>}
   </>
 }

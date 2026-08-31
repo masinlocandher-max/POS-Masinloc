@@ -4,6 +4,10 @@ on:
   push:
     branches: ['**']
   pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -13,17 +17,16 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: npm
 
-      - run: npm ci
+      - name: Install locked dependencies
+        run: npm ci
 
-      # `npm run build` runs tsc, vite build, and scripts/postbuild.mjs. The
-      # postbuild step fails the job if index.html ever again ships absolute or
-      # non-ASCII asset URLs — the defect that made the deployed app 404.
-      - run: npm run build
+      - name: Typecheck and build
+        run: npm run build
 
-      - name: Confirm the SPA fallback and Pages guard were emitted
+      - name: Verify protected staging output
         run: |
           test -f dist/index.html
           test -f dist/404.html
@@ -31,3 +34,10 @@ jobs:
           test -f dist/robots.txt
           grep -q 'Disallow: /' dist/robots.txt
           grep -q 'noindex' dist/index.html
+
+      - name: Upload production candidate bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pos-production-dist
+          path: dist
+          if-no-files-found: error

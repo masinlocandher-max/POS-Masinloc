@@ -8,14 +8,20 @@ const supabase = createClient(
 );
 
 type Severity = "low" | "medium" | "high" | "critical";
+type AuthUser = { id: string; email?: string | null };
 
 function originAllowed(origin: string) {
   if (!origin) return false;
   if (origin === "https://masinloc-zambales.com" || origin === "https://www.masinloc-zambales.com") return true;
   try {
     const u = new URL(origin);
+    if ((u.hostname === "localhost" || u.hostname === "127.0.0.1") && u.protocol === "http:") return true;
     if (u.protocol !== "https:") return false;
-    return u.hostname.endsWith(".vercel.app") && u.hostname.startsWith("masinloc-website-");
+    if (u.hostname === "masinlocandher-max.github.io") return true;
+    if (!u.hostname.endsWith(".vercel.app")) return false;
+    return u.hostname === "pos-masinloc.vercel.app" ||
+      u.hostname.startsWith("pos-masinloc-") ||
+      u.hostname.startsWith("masinloc-website-");
   } catch {
     return false;
   }
@@ -87,6 +93,16 @@ async function checkRate(req: Request, key: string, limit: number, windowSeconds
   return data === true;
 }
 
+async function authUser(req: Request): Promise<AuthUser | null> {
+  const header = req.headers.get("authorization") || "";
+  if (!header.toLowerCase().startsWith("bearer ")) return null;
+  const token = header.slice(7).trim();
+  if (!token) return null;
+  const { data, error } = await supabase.auth.getUser(token);
+  if (error || !data.user) return null;
+  return { id: data.user.id, email: data.user.email };
+}
+
 function isUuid(v: unknown) {
   return typeof v === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(v);
 }
@@ -126,7 +142,11 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ ok: false, error: "Too many requests" }), { status: 429, headers });
       }
 
-      const { data, error } = await supabase.rpc("pos_guest_tracking_internal", { p_tracking_token: token });
+      const buyer = await authUser(req);
+      const { data, error } = await supabase.rpc("pos_buyer_tracking_internal", {
+        p_tracking_token: token,
+        p_buyer_user_id: buyer?.id || null,
+      });
       if (error) {
         console.error("pos_track_db_error", error.message);
         throw new Error("SERVER");
@@ -161,17 +181,29 @@ Deno.serve(async (req) => {
 
     const action = String(body.action || "create");
     if (action === "chat") {
+      const buyer = await authUser(req);
+      if (!buyer) {
+        await logSecurityEvent(req, "pos_chat_account_required", "low", {});
+        return new Response(JSON.stringify({ ok: false, error: "Sign in to message the store." }), { status: 401, headers });
+      }
       const token = String(body.trackingToken || "");
       const message = text(body.message, 1000, true)!;
       if (!isUuid(token)) throw new Error("VALIDATION");
-      if (!(await checkRate(req, `pos-chat:${token.slice(0, 8)}`, 30, 3600))) {
-        await logSecurityEvent(req, "pos_chat_rate_limit", "medium", {});
-        return new Response(JSON.stringify({ ok: false, error: "Too many messages" }), { status: 429, headers });
+      if (!(await checkRate(req, `pos-chat-order:${buyer.id}:${token.slice(0, 8)}`, 30, 3600)) ||
+          !(await checkRate(req, `pos-chat-account:${buyer.id}`, 100, 3600))) {
+        await logSecurityEvent(req, "pos_chat_rate_limit", "medium", { buyer_user_id: buyer.id });
+        return new Response(JSON.stringify({ ok: false, error: "Too many messages. Please try again later." }), { status: 429, headers });
       }
-      const { data, error } = await supabase.rpc("pos_guest_message_internal", { p_tracking_token: token, p_message: message });
+      const { data, error } = await supabase.rpc("pos_buyer_message_internal", {
+        p_tracking_token: token,
+        p_buyer_user_id: buyer.id,
+        p_message: message,
+      });
       if (error) {
         console.error("pos_chat_db_error", error.message);
-        throw new Error(error.message.includes("Chat closed") ? "CHAT_CLOSED" : "SERVER");
+        if (error.message.includes("another buyer account")) throw new Error("ACCOUNT_MISMATCH");
+        if (error.message.includes("Chat closed")) throw new Error("CHAT_CLOSED");
+        throw new Error("SERVER");
       }
       return new Response(JSON.stringify({ ok: true, messageId: data }), { status: 201, headers });
     }
@@ -204,6 +236,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, error: "Payment reference is required." }), { status: 400, headers });
     }
 
+    const buyer = await authUser(req);
     const { data, error } = await supabase.rpc("pos_create_guest_order_internal", {
       p_slug: slug,
       p_source: source,
@@ -246,6 +279,17 @@ Deno.serve(async (req) => {
       throw new Error("SERVER");
     }
 
+    if (buyer && data && typeof data === "object" && "tracking_token" in data && isUuid((data as Record<string, unknown>).tracking_token)) {
+      const { error: attachError } = await supabase.rpc("pos_attach_buyer_to_order_internal", {
+        p_tracking_token: (data as Record<string, unknown>).tracking_token,
+        p_buyer_user_id: buyer.id,
+      });
+      if (attachError) {
+        console.error("pos_buyer_attach_error", attachError.message);
+        if (attachError.message.includes("another buyer account")) throw new Error("ACCOUNT_MISMATCH");
+      }
+    }
+
     return new Response(JSON.stringify({ ok: true, order: data }), { status: 201, headers });
   } catch (err) {
     const code = err instanceof Error ? err.message : "SERVER";
@@ -254,6 +298,7 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ ok: false, error: "Please check the order details and try again." }), { status: 400, headers });
     }
     if (code === "CHAT_CLOSED") return new Response(JSON.stringify({ ok: false, error: "This order chat is closed." }), { status: 409, headers });
+    if (code === "ACCOUNT_MISMATCH") return new Response(JSON.stringify({ ok: false, error: "This order is linked to another buyer account." }), { status: 403, headers });
     console.error("pos_order_error", code);
     return new Response(JSON.stringify({ ok: false, error: "We could not process the request right now." }), { status: 500, headers });
   }

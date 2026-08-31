@@ -45,7 +45,7 @@ export default function StaffChatOverlay({ context, userId }: { context: Merchan
       .from('pos_orders')
       .select('id,order_number,customer_name,status,updated_at')
       .eq('merchant_id', merchantId)
-      .eq('payment_status', 'paid')
+      .not('buyer_user_id', 'is', null)
       .not('status', 'in', '(completed,cancelled)')
       .order('updated_at', { ascending: false })
       .limit(100)
@@ -122,21 +122,21 @@ export default function StaffChatOverlay({ context, userId }: { context: Merchan
   if (orders.length === 0) return null
 
   return <>
-    <button className="staff-chat-launcher" onClick={() => setOpen(value => !value)} aria-label="Paid order messages" aria-expanded={open} aria-controls="staff-chat-panel">
+    <button className="staff-chat-launcher" onClick={() => setOpen(value => !value)} aria-label="Order messages" aria-expanded={open} aria-controls="staff-chat-panel">
       <MessageCircle />
       <span>{orders.length > 99 ? '99+' : orders.length}</span>
     </button>
 
-    {open && <section id="staff-chat-panel" className="staff-chat-panel" aria-label="Paid order messages">
-      <header><div><strong>Order messages</strong><small>{context.merchant_name} · paid orders only</small></div><button onClick={() => setOpen(false)} aria-label="Close messages"><X /></button></header>
+    {open && <section id="staff-chat-panel" className="staff-chat-panel" aria-label="Order messages">
+      <header><div><strong>Order messages</strong><small>{context.merchant_name} · signed-in buyers</small></div><button onClick={() => setOpen(false)} aria-label="Close messages"><X /></button></header>
       {error && <div className="staff-chat-error">{error}</div>}
-      <div className="staff-chat-orders" role="tablist" aria-label="Paid open orders">
+      <div className="staff-chat-orders" role="tablist" aria-label="Account-linked open orders">
         {orders.map(order => <button key={order.id} role="tab" aria-selected={order.id === selectedOrderId} className={order.id === selectedOrderId ? 'active' : ''} onClick={() => setSelectedOrderId(order.id)}>
           <strong>#{order.order_number}</strong><span>{order.customer_name}</span><small>{order.status.replaceAll('_', ' ')}</small>
         </button>)}
       </div>
       <div className="staff-chat-thread">
-        {messages.length === 0 ? <p className="staff-chat-no-message">No messages yet.</p> : messages.map(item => <div key={item.id} className={`staff-chat-message ${item.sender_type}`}>
+        {messages.length === 0 ? <p className="staff-chat-no-message">No messages yet. The buyer can message before payment confirmation.</p> : messages.map(item => <div key={item.id} className={`staff-chat-message ${item.sender_type}`}>
           <span>{item.message}</span><small>{item.sender_type === 'staff' ? 'Store' : item.sender_type === 'customer' ? 'Customer' : 'System'} · {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</small>
         </div>)}
       </div>

@@ -1,4 +1,4 @@
-import { posOrderEndpoint, supabasePublishableKey, supabaseUrl } from './supabase'
+import { posOrderEndpoint, supabase, supabasePublishableKey, supabaseUrl } from './supabase'
 import type { Fulfillment, OrderStatus, PaymentMethod, PaymentStatus, PublicMenuCategory, PublicStorefront } from './posApi'
 
 type PublicPaymentMethod = {
@@ -23,6 +23,14 @@ async function readJson(response: Response): Promise<Record<string, unknown>> {
   const body: unknown = await response.json()
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new Error('Unexpected server response')
   return body as Record<string, unknown>
+}
+
+async function requestHeaders(json = false) {
+  const { data } = await supabase.auth.getSession()
+  const headers: Record<string, string> = { apikey: supabasePublishableKey }
+  if (json) headers['Content-Type'] = 'application/json'
+  if (data.session?.access_token) headers.Authorization = `Bearer ${data.session.access_token}`
+  return headers
 }
 
 export async function loadStorefront(slug: string): Promise<StorefrontPayload> {
@@ -60,7 +68,7 @@ export async function submitGuestOrder(input: {
 }) {
   const response = await fetch(posOrderEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: supabasePublishableKey },
+    headers: await requestHeaders(true),
     referrerPolicy: 'strict-origin-when-cross-origin',
     body: JSON.stringify({ action: 'create', clientId: guestClientId(), idempotencyKey: crypto.randomUUID(), source: input.source || 'qr', ...input, website: '' }),
   })
@@ -72,19 +80,33 @@ export async function submitGuestOrder(input: {
 
 export async function loadGuestTracking(trackingToken: string) {
   const response = await fetch(`${posOrderEndpoint}?resource=track&token=${encodeURIComponent(trackingToken)}`, {
-    headers: { apikey: supabasePublishableKey },
+    headers: await requestHeaders(),
     referrerPolicy: 'strict-origin-when-cross-origin',
   })
   const body = await readJson(response)
   if (!response.ok || body.ok !== true) throw new Error(typeof body.error === 'string' ? body.error : 'Could not load order')
   if (!body.order || typeof body.order !== 'object') throw new Error('Could not load order')
-  return body.order as { order_number: number; customer_name: string; fulfillment: Fulfillment; table_label: string | null; status: OrderStatus; payment_status: PaymentStatus; total: number; created_at: string; updated_at: string; messages: Array<{ sender_type: string; message: string; created_at: string }> }
+  return body.order as {
+    order_number: number
+    customer_name: string
+    fulfillment: Fulfillment
+    table_label: string | null
+    status: OrderStatus
+    payment_status: PaymentStatus
+    total: number
+    created_at: string
+    updated_at: string
+    chat_available: boolean
+    chat_account_required: boolean
+    chat_account_mismatch: boolean
+    messages: Array<{ sender_type: string; message: string; created_at: string }>
+  }
 }
 
 export async function sendGuestChat(trackingToken: string, message: string) {
   const response = await fetch(posOrderEndpoint, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', apikey: supabasePublishableKey },
+    headers: await requestHeaders(true),
     referrerPolicy: 'strict-origin-when-cross-origin',
     body: JSON.stringify({ action: 'chat', trackingToken, message, website: '' }),
   })

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bike, CheckCircle2, ChevronLeft, MessageCircle, Minus, Plus, QrCode, ShoppingBag, Utensils } from 'lucide-react'
+import BuyerAccountAccess from './BuyerAccountAccess'
 import type { Fulfillment, PaymentMethod, PublicMenuProduct } from './lib/posApi'
 import { loadGuestTracking, loadStorefront, sendGuestChat, submitGuestOrder, type StorefrontPayload } from './lib/publicPosApi'
 
@@ -10,10 +11,11 @@ export default function GuestOrdering({ slug }: { slug: string }) {
   const params = useMemo(() => new URLSearchParams(window.location.search), [])
   const table = params.get('table')?.trim() || ''
   const source = params.get('source') === 'marketplace' ? 'marketplace' : 'qr'
+  const initialTrackingToken = params.get('track')?.trim() || ''
   const [payload, setPayload] = useState<StorefrontPayload | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [step, setStep] = useState<Step>('name')
+  const [step, setStep] = useState<Step>(initialTrackingToken ? 'tracking' : 'name')
   const [name, setName] = useState('')
   const [fulfillment, setFulfillment] = useState<Fulfillment>(table ? 'dine_in' : source === 'marketplace' ? 'pickup' : 'dine_in')
   const [cart, setCart] = useState<Record<string, number>>({})
@@ -24,7 +26,7 @@ export default function GuestOrdering({ slug }: { slug: string }) {
   const [landmark, setLandmark] = useState('')
   const [loyalty, setLoyalty] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [trackingToken, setTrackingToken] = useState('')
+  const [trackingToken, setTrackingToken] = useState(initialTrackingToken)
   const [tracking, setTracking] = useState<Awaited<ReturnType<typeof loadGuestTracking>> | null>(null)
   const [chat, setChat] = useState('')
 
@@ -77,6 +79,9 @@ export default function GuestOrdering({ slug }: { slug: string }) {
         loyaltyOptIn: loyalty,
       })
       setTrackingToken(result.tracking_token)
+      const url = new URL(window.location.href)
+      url.searchParams.set('track', result.tracking_token)
+      window.history.replaceState({}, '', url.toString())
       setStep('tracking')
     } catch (e) { setError(e instanceof Error ? e.message : 'Order failed') }
     finally { setSubmitting(false) }
@@ -87,10 +92,10 @@ export default function GuestOrdering({ slug }: { slug: string }) {
   if (!payload) return null
 
   return (
-    <GuestFrame title={payload.store.name} subtitle={payload.store.outlet.name} onBack={step === 'name' ? undefined : () => setStep(step === 'fulfillment' ? 'name' : step === 'menu' ? (table ? 'name' : 'fulfillment') : step === 'checkout' ? 'menu' : 'tracking')}>
+    <GuestFrame title={payload.store.name} subtitle={payload.store.outlet.name} onBack={step === 'name' || step === 'tracking' ? undefined : () => setStep(step === 'fulfillment' ? 'name' : step === 'menu' ? (table ? 'name' : 'fulfillment') : 'menu')}>
       {error && <div className="inline-error">{error}<button onClick={() => setError('')}>×</button></div>}
 
-      {step === 'name' && <section className="guest-intro"><div className="restaurant-symbol"><Utensils /></div><p>Welcome to {payload.store.name}</p><h1>Order for</h1><input autoFocus value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Your name" /><button className="primary" disabled={!name.trim()} onClick={continueAfterName}>Continue</button><small>No account or sign-up required.</small></section>}
+      {step === 'name' && <section className="guest-intro"><div className="restaurant-symbol"><Utensils /></div><p>Welcome to {payload.store.name}</p><h1>Order for</h1><input autoFocus value={name} maxLength={120} onChange={e => setName(e.target.value)} placeholder="Your name" /><button className="primary" disabled={!name.trim()} onClick={continueAfterName}>Continue</button><small>An account is optional for ordering, but required to message the seller.</small><BuyerAccountAccess compact /></section>}
 
       {step === 'fulfillment' && <section><p className="eyebrow">Order for {name}</p><h1>How would you like your order?</h1><div className="fulfillment-grid">
         {payload.store.outlet.dine_in_enabled && source !== 'marketplace' && <Choice icon={<Utensils />} title="Dine In" detail="Eat at the store" active={fulfillment === 'dine_in'} onClick={() => setFulfillment('dine_in')} />}
@@ -129,7 +134,6 @@ function TrackingView({ tracking, onSend, chat, setChat }: { tracking: Awaited<R
   if (!tracking) return <div className="center-state"><div className="spinner" /><strong>Loading order status…</strong></div>
   const labels = tracking.fulfillment === 'delivery' ? ['Payment verified', 'Preparing', 'Ready', 'Out for delivery', 'Completed'] : ['Payment verified', 'Preparing', 'Ready', 'Completed']
   const rank: Record<string, number> = { awaiting_payment: -1, payment_review: -1, paid: 0, preparing: 1, ready: 2, out_for_delivery: 3, completed: tracking.fulfillment === 'delivery' ? 4 : 3 }
-  const paid = tracking.payment_status === 'paid'
   const closed = tracking.status === 'completed' || tracking.status === 'cancelled'
-  return <section className="tracking"><CheckCircle2 /><p>Order #{tracking.order_number}</p><h1>{tracking.status.replaceAll('_', ' ')}</h1><div className="timeline">{labels.map((label, index) => <span key={label} className={index <= (rank[tracking.status] ?? -1) ? 'done' : ''}>{label}</span>)}</div>{paid ? <div className="chat-box"><div className="section-title"><h2>Message store</h2><MessageCircle /></div><div className="chat-history">{tracking.messages.length ? tracking.messages.map((m, index) => <p key={`${m.created_at}-${index}`} className={`chat-${m.sender_type}`}><b>{m.sender_type === 'customer' ? 'You' : m.sender_type === 'staff' ? 'Store' : 'Update'}</b>{m.message}</p>) : <span>No messages yet.</span>}</div>{closed ? <div className="payment-note">This order message thread is closed.</div> : <div className="chat-compose"><input value={chat} onChange={e => setChat(e.target.value)} maxLength={1000} placeholder="Message about this order" /><button disabled={sending || !chat.trim()} onClick={async () => { setSending(true); try { await onSend(chat.trim()) } finally { setSending(false) } }}>Send</button></div>}</div> : <div className="payment-note">Messaging becomes available after the store confirms payment.</div>}</section>
+  return <section className="tracking"><CheckCircle2 /><p>Order #{tracking.order_number}</p><h1>{tracking.status.replaceAll('_', ' ')}</h1><div className="timeline">{labels.map((label, index) => <span key={label} className={index <= (rank[tracking.status] ?? -1) ? 'done' : ''}>{label}</span>)}</div>{tracking.chat_available ? <div className="chat-box"><div className="section-title"><h2>Message store</h2><MessageCircle /></div><div className="chat-history">{tracking.messages.length ? tracking.messages.map((m, index) => <p key={`${m.created_at}-${index}`} className={`chat-${m.sender_type}`}><b>{m.sender_type === 'customer' ? 'You' : m.sender_type === 'staff' ? 'Store' : 'Update'}</b>{m.message}</p>) : <span>No messages yet. You can ask the seller about this order now.</span>}</div>{closed ? <div className="payment-note">This order message thread is closed.</div> : <div className="chat-compose"><input value={chat} onChange={e => setChat(e.target.value)} maxLength={1000} placeholder="Message about this order" /><button disabled={sending || !chat.trim()} onClick={async () => { setSending(true); try { await onSend(chat.trim()) } finally { setSending(false) } }}>Send</button></div>}</div> : tracking.chat_account_mismatch ? <div className="payment-note">This order is linked to a different buyer account, so its messages are private.</div> : closed ? <div className="payment-note">This order is closed.</div> : <BuyerAccountAccess compact />}</section>
 }

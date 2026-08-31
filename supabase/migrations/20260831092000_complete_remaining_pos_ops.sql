@@ -1,0 +1,4 @@
+-- Applied to production Supabase on 2026-08-31.
+-- Adds outlet inventory + stock transfers, purchase order line/receiving RPCs,
+-- manager-authorized retail price overrides/discounts, and billing checkout requests.
+-- Production schema is the source of truth; this marker keeps repository migration history aligned.
